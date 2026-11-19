@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Соник: Рывок — 100 Уровней</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:ital,wght@0,700;0,900;1,900&display=swap');
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #0f172a;
+            font-family: 'Rubik', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        #game-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            max-width: 1200px;
+            max-height: 700px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75);
+            border-radius: 16px;
+            overflow: hidden;
+            background: linear-gradient(180deg, #1d4ed8 0%, #38bdf8 60%, #bae6fd 100%);
+        }
+
+        @media (max-width: 768px) {
+            #game-wrapper {
+                max-width: 100%;
+                max-height: 100%;
+                border-radius: 0;
+            }
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Ретро HUD в стиле Sega */
+        .hud-text {
+            font-family: 'Press Start 2P', monospace;
+            text-shadow: 2px 2px 0px #000, -1px -1px 0px #000, 1px -1px 0px #000, -1px 1px 0px #000;
+        }
+
+        .sega-btn {
+            background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+            border: 3px solid #ffffff;
+            box-shadow: 0 6px 0 #1e3a8a, 0 10px 20px rgba(0,0,0,0.4);
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .sega-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #1e3a8a, 0 4px 10px rgba(0,0,0,0.4);
+        }
+
+        .gold-btn {
+            background: linear-gradient(180deg, #facc15 0%, #ca8a04 100%);
+            border: 3px solid #ffffff;
+            box-shadow: 0 6px 0 #854d0e, 0 10px 20px rgba(0,0,0,0.4);
+            color: #1e293b;
+        }
+
+        .gold-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #854d0e;
+        }
+
+        .touch-pad {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(4px);
+            border: 2px solid rgba(255, 255, 255, 0.55);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+        }
+
+        .touch-pad:active {
+            background: rgba(255, 255, 255, 0.5);
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-wrapper">
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Верхняя панель показателей (HUD) -->
+        <div id="hud" class="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none hidden">
+            <div class="flex flex-col gap-2">
+                <div class="flex items-center gap-2">
+                    <span class="hud-text text-yellow-400 text-xs sm:text-sm">ОЧКИ</span>
+                    <span id="scoreDisplay" class="hud-text text-white text-xs sm:text-sm">0</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="hud-text text-yellow-400 text-xs sm:text-sm">ВРЕМЯ</span>
+                    <span id="timeDisplay" class="hud-text text-white text-xs sm:text-sm">0:00</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="hud-text text-yellow-400 text-xs sm:text-sm">КОЛЬЦА</span>
+                    <span id="ringsDisplay" class="hud-text text-white text-xs sm:text-sm">0</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="hud-text text-cyan-300 text-xs sm:text-sm">УРОВЕНЬ</span>
+                    <span id="levelDisplay" class="hud-text text-white text-xs sm:text-sm">1/100</span>
+                </div>
+            </div>
+
+            <!-- Индикатор скорости / Ускорение и кнопка меню -->
+            <div class="flex flex-col items-end gap-1.5">
+                <div class="hud-text text-cyan-300 text-[10px] sm:text-xs">УСКОРЕНИЕ</div>
+                <div class="w-28 sm:w-40 h-4 bg-slate-900/80 border-2 border-white rounded-full overflow-hidden p-0.5">
+                    <div id="boostBar" class="h-full bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full transition-all duration-75" style="width: 100%;"></div>
+                </div>
+                <div class="flex gap-1.5 pointer-events-auto mt-1">
+                    <button id="menuBtn" class="bg-slate-900/70 hover:bg-slate-900 text-white px-2.5 py-1 rounded-lg text-xs border border-white/30 cursor-pointer">
+                        ☰ Уровни
+                    </button>
+                    <button id="soundToggle" class="bg-slate-900/70 hover:bg-slate-900 text-white px-2.5 py-1 rounded-lg text-xs border border-white/30 cursor-pointer">
+                        🔊 Звук: ВКЛ
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Стартовый экран -->
+        <div id="startScreen" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/45 backdrop-blur-xs p-4 text-center">
+            <div class="bg-blue-700/95 border-4 border-yellow-400 rounded-3xl p-5 sm:p-8 max-w-lg w-full shadow-2xl transform transition-all">
+                <div id="zoneBadge" class="inline-block bg-red-600 text-white font-black italic px-4 py-1 rounded-full text-xs sm:text-sm tracking-wider mb-2 border-2 border-white shadow-md">
+                    УРОВЕНЬ 1/100 • ЗЕЛЁНЫЕ ХОЛМЫ
+                </div>
+                <h1 class="text-4xl sm:text-6xl font-black italic text-white tracking-tight mb-2 drop-shadow-[0_5px_0_#1e3a8a]">
+                    СОНИК <span class="text-yellow-400">РЫВОК</span>
+                </h1>
+                <p class="text-blue-100 text-xs sm:text-sm mb-4 font-medium">
+                    Пройди все 100 уровней и останови Доктора Эггмана!
+                </p>
+
+                <!-- Выбор любого из 100 уровней -->
+                <div class="mb-4 bg-blue-950/60 p-3 rounded-2xl border border-blue-400/30">
+                    <div class="flex justify-between items-center text-xs font-bold text-yellow-300 uppercase tracking-wider mb-2">
+                        <span>Выбор уровня (1 – 100):</span>
+                        <span id="stageCycleLabel" class="text-cyan-300">ЭТАП 1 / 20</span>
+                    </div>
+                    <div class="flex items-center gap-2 mb-2.5">
+                        <input id="levelSlider" type="range" min="1" max="100" value="1" class="w-full accent-yellow-400 cursor-pointer h-2 bg-blue-900 rounded-lg">
+                        <input id="levelInput" type="number" min="1" max="100" value="1" class="w-16 bg-blue-900 text-yellow-300 font-black text-center border-2 border-yellow-400 rounded-xl py-1 text-sm">
+                    </div>
+                    <div id="levelSelector" class="grid grid-cols-5 gap-1.5">
+                        <button data-lvl="1" class="lvl-btn bg-yellow-400 text-slate-900 border-2 border-white font-black py-1.5 rounded-xl text-xs shadow-md cursor-pointer">1</button>
+                        <button data-lvl="25" class="lvl-btn bg-blue-900/80 text-white border-2 border-blue-400/50 font-black py-1.5 rounded-xl text-xs hover:bg-blue-800 cursor-pointer">25</button>
+                        <button data-lvl="50" class="lvl-btn bg-blue-900/80 text-white border-2 border-blue-400/50 font-black py-1.5 rounded-xl text-xs hover:bg-blue-800 cursor-pointer">50</button>
+                        <button data-lvl="75" class="lvl-btn bg-blue-900/80 text-white border-2 border-blue-400/50 font-black py-1.5 rounded-xl text-xs hover:bg-blue-800 cursor-pointer">75</button>
+                        <button data-lvl="100" class="lvl-btn bg-red-900/80 text-red-200 border-2 border-red-500/60 font-black py-1.5 rounded-xl text-xs hover:bg-red-800 cursor-pointer">100</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 text-left bg-blue-950/60 p-3 rounded-xl border border-blue-400/30 mb-5 text-xs sm:text-sm text-blue-100">
+                    <div>⬅️ ➡️ / <b>A D</b> : Бег</div>
+                    <div>⬆️ / <b>Пробел</b> : Прыжок</div>
+                    <div>⬇️ / <b>S</b> : Клубок</div>
+                    <div>⚡ / <b>Shift</b> : Ускорение</div>
+                </div>
+
+                <button id="startBtn" class="gold-btn w-full py-3.5 rounded-2xl font-black text-xl sm:text-2xl uppercase tracking-wider cursor-pointer">
+                    ▶ СТАРТ ИГРЫ
+                </button>
+            </div>
+        </div>
+
+        <!-- Экран окончания игры / победы -->
+        <div id="gameOverScreen" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/75 backdrop-blur-sm p-4 text-center hidden">
+            <div class="bg-slate-900 border-4 border-blue-500 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl">
+                <h2 id="endTitle" class="text-3xl sm:text-4xl font-black italic text-red-500 mb-2">ИГРА ОКОНЧЕНА</h2>
+                <p id="endSubtitle" class="text-slate-300 text-sm mb-6">Роботы Эггмана оказались быстрее...</p>
+                
+                <div class="bg-slate-800/80 rounded-2xl p-4 mb-6 flex justify-around border border-slate-700">
+                    <div>
+                        <div class="text-xs text-slate-400 uppercase">Очки</div>
+                        <div id="finalScore" class="text-2xl font-black text-yellow-400">0</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-400 uppercase">Кольца</div>
+                        <div id="finalRings" class="text-2xl font-black text-amber-300">0</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-400 uppercase">Дистанция</div>
+                        <div id="finalDist" class="text-2xl font-black text-cyan-400">0м</div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-3">
+                    <button id="nextLevelBtn" class="gold-btn w-full py-3.5 rounded-2xl font-black text-lg uppercase tracking-wider cursor-pointer hidden">
+                        ▶ СЛЕДУЮЩИЙ УРОВЕНЬ
+                    </button>
+                    <button id="restartBtn" class="sega-btn text-white w-full py-3.5 rounded-2xl font-black text-lg uppercase tracking-wider cursor-pointer">
+                        ↻ ИГРАТЬ СНОВА
+                    </button>
+                    <button id="toMenuBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 w-full py-2.5 rounded-2xl font-bold text-sm uppercase tracking-wider cursor-pointer">
+                        ☰ ВЫБРАТЬ УРОВЕНЬ
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Сенсорное управление для мобильных устройств -->
+        <div id="mobileControls" class="absolute bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none md:hidden hidden">
+            <div class="flex gap-3 pointer-events-auto">
+                <button id="btnLeft" class="touch-pad w-14 h-14 rounded-2xl flex items-center justify-center text-white text-2xl font-bold">◀</button>
+                <button id="btnRight" class="touch-pad w-14 h-14 rounded-2xl flex items-center justify-center text-white text-2xl font-bold">▶</button>
+            </div>
+            <div class="flex gap-3 pointer-events-auto">
+                <button id="btnBoost" class="touch-pad w-14 h-14 rounded-full flex items-center justify-center text-cyan-300 text-xl font-black border-cyan-400">⚡</button>
+                <button id="btnJump" class="touch-pad w-16 h-16 rounded-full flex items-center justify-center text-yellow-300 text-xs font-black border-yellow-400">ПРЫЖОК</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+/**
+ * СОНИК: РЫВОК — 100 УРОВНЕЙ
+ * Полностью автономный 2D платформер-раннер с 100 уровнями,
+ * физикой разгона, кольцами, бадниками, шипами, пружинами и Web Audio звуком.
+ */
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const wrapper = document.getElementById('game-wrapper');
+
+// UI элементы
+const startScreen = document.getElementById('startScreen');
+const gameOverScreen = document.getElementById('gameOverScreen');
+const hud = document.getElementById('hud');
+const mobileControls = document.getElementById('mobileControls');
+const scoreDisplay = document.getElementById('scoreDisplay');
+const timeDisplay = document.getElementById('timeDisplay');
+const ringsDisplay = document.getElementById('ringsDisplay');
+const levelDisplay = document.getElementById('levelDisplay');
+const zoneBadge = document.getElementById('zoneBadge');
+const levelSlider = document.getElementById('levelSlider');
+const levelInput = document.getElementById('levelInput');
+const stageCycleLabel = document.getElementById('stageCycleLabel');
+const boostBar = document.getElementById('boostBar');
+const nextLevelBtn = document.getElementById('nextLevelBtn');
+const soundToggle = document.getElementById('soundToggle');
+
+const MAX_LEVELS = 100;
+
+// 5 визуальных биомов, которые чередуются на протяжении 100 уровней
+const BASE_ZONES = [
+    {
+        name: 'ЗЕЛЁНЫЕ ХОЛМЫ',
+        skyTop: '#1d4ed8',
+        skyMid: '#38bdf8',
+        skyBot: '#bae6fd',
+        hillBack: '#0284c7',
+        groundTop: '#22c55e',
+        groundDark: '#15803d',
+        soilLight: '#b45309',
+        soilDark: '#78350f',
+        palm: true
+    },
+    {
+        name: 'МРАМОРНЫЕ РУИНЫ',
+        skyTop: '#311042',
+        skyMid: '#7e22ce',
+        skyBot: '#f97316',
+        hillBack: '#581c87',
+        groundTop: '#a855f7',
+        groundDark: '#6b21a8',
+        soilLight: '#475569',
+        soilDark: '#1e293b',
+        palm: false
+    },
+    {
+        name: 'ГОРОД ПРУЖИН',
+        skyTop: '#9a3412',
+        skyMid: '#f97316',
+        skyBot: '#fde047',
+        hillBack: '#c2410c',
+        groundTop: '#f59e0b',
+        groundDark: '#b45309',
+        soilLight: '#334155',
+        soilDark: '#0f172a',
+        palm: false
+    },
+    {
+        name: 'ХИМЗАВОД',
+        skyTop: '#020617',
+        skyMid: '#0f172a',
+        skyBot: '#1e3a8a',
+        hillBack: '#1d4ed8',
+        groundTop: '#06b6d4',
+        groundDark: '#0e7490',
+        soilLight: '#1e293b',
+        soilDark: '#090d16',
+        palm: false
+    },
+    {
+        name: 'ЯЙЦО СМЕРТИ',
+        skyTop: '#180404',
+        skyMid: '#450a0a',
+        skyBot: '#991b1b',
+        hillBack: '#7f1d1d',
+        groundTop: '#ef4444',
+        groundDark: '#991b1b',
+        soilLight: '#27272a',
+        soilDark: '#09090b',
+        palm: false
+    }
+];
+
+// Генератор параметров для любого уровня от 1 до 100
+function getLevelConfig(lvl) {
+    const clamped = Math.max(1, Math.min(MAX_LEVELS, lvl));
+    const zone = BASE_ZONES[(clamped - 1) % BASE_ZONES.length];
+    const stage = Math.floor((clamped - 1) / BASE_ZONES.length) + 1;
+    const isFinal100 = clamped === MAX_LEVELS;
+    const suffix = isFinal100 ? ' • ФИНАЛ 100' : (stage > 1 ? ` • ЭТАП ${stage}/20` : '');
+    const progress = (clamped - 1) / (MAX_LEVELS - 1);
+
+    return {
+        ...zone,
+        stage,
+        fullName: `${zone.name}${suffix}`,
+        length: Math.round(11000 + progress * 24000),
+        enemySpeed: 1.1 + progress * 2.5,
+        hillAmp: 45 + progress * 65,
+        hasSpikes: clamped >= 2,
+        spikeChance: Math.min(0.45, 0.1 + progress * 0.35)
+    };
+}
+
+// Звуковой движок на Web Audio API (без внешних файлов)
+let soundEnabled = true;
+let audioCtx = null;
+
+function playTone(freq, endFreq, duration, type = 'sine', vol = 0.12) {
+    if (!soundEnabled) return;
+    try {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        if (endFreq) {
+            osc.frequency.exponentialRampToValueAtTime(endFreq, audioCtx.currentTime + duration);
+        }
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+    } catch (e) {
+        // Игнорируем блокировку автовоспроизведения до первого клика
+    }
+}
+
+const sfx = {
+    jump: () => playTone(260, 620, 0.18, 'square', 0.08),
+    ring: () => {
+        playTone(987, 1318, 0.08, 'sine', 0.1);
+        setTimeout(() => playTone(1318, 1568, 0.14, 'sine', 0.1), 65);
+    },
+    spring: () => playTone(220, 880, 0.25, 'triangle', 0.14),
+    pop: () => playTone(320, 90, 0.15, 'sawtooth', 0.12),
+    hurt: () => playTone(440, 110, 0.35, 'sawtooth', 0.14),
+    boost: () => playTone(180, 540, 0.2, 'sawtooth', 0.08),
+    win: () => {
+        [523, 659, 784, 1046].forEach((f, i) => {
+            setTimeout(() => playTone(f, f * 1.05, 0.2, 'square', 0.09), i * 110);
+        });
+    }
+};
+
+// Состояние игры
+let width = 800;
+let height = 500;
+let gameState = 'START'; // START | PLAYING | WIN | GAMEOVER
+let currentLevel = 1;
+let score = 0;
+let rings = 0;
+let startTime = 0;
+let elapsedTime = 0;
+let cameraX = 0;
+let levelLength = 12000;
+let lastFrameTime = performance.now();
+
+// Игровые сущности
+let platforms = [];
+let ringsList = [];
+let scatteredRings = [];
+let enemies = [];
+let springs = [];
+let spikes = [];
+let particles = [];
+let clouds = [];
+let bgHills = [];
+
+// Объект игрока (Соник)
+const sonic = {
+    x: 150,
+    y: 200,
+    vx: 0,
+    vy: 0,
+    radius: 20,
+    grounded: false,
+    rolling: false,
+    facing: 1,
+    animFrame: 0,
+    boost: 100,
+    boosting: false,
+    invulnTimer: 0
+};
+
+// Управление с клавиатуры и экрана
+const keys = {
+    left: false,
+    right: false,
+    up: false,
+    down: false,
+    boost: false
+};
+
+// Адаптация размера Canvas под экран
+function resizeCanvas() {
+    const rect = wrapper.getBoundingClientRect();
+    width = rect.width || 800;
+    height = rect.height || 500;
+    canvas.width = width;
+    canvas.height = height;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// Высота земли в любой точке X для текущего уровня
+function getGroundY(x) {
+    const cfg = getLevelConfig(currentLevel);
+    const base = height * 0.76;
+    if (x < 500) return base;
+    const wave1 = Math.sin((x - 500) * 0.0022) * cfg.hillAmp;
+    const wave2 = Math.cos((x - 500) * 0.0055) * (cfg.hillAmp * 0.35);
+    return base + wave1 + wave2;
+}
+
+// Генерация уровня по номеру (1..100)
+function generateLevel() {
+    const cfg = getLevelConfig(currentLevel);
+    levelLength = cfg.length;
+
+    platforms = [];
+    ringsList = [];
+    scatteredRings = [];
+    enemies = [];
+    springs = [];
+    spikes = [];
+    particles = [];
+    clouds = [];
+    bgHills = [];
+
+    // Облака и фоновые холмы
+    for (let i = 0; i < 28; i++) {
+        clouds.push({
+            x: i * 450 + Math.random() * 200,
+            y: 40 + Math.random() * (height * 0.32),
+            scale: 0.7 + Math.random() * 0.8,
+            speed: 0.15 + Math.random() * 0.2
+        });
+    }
+    for (let i = 0; i < 40; i++) {
+        bgHills.push({
+            x: i * 380,
+            w: 240 + Math.random() * 180,
+            h: 110 + Math.random() * 130
+        });
+    }
+
+    // Генерация колец, бадников, пружин, платформ и шипов вдоль всей трассы
+    let cursor = 450;
+    while (cursor < levelLength - 600) {
+        const segmentType = Math.random();
+
+        if (segmentType < 0.32) {
+            // Дорожка из золотых колец по рельефу
+            const count = 5 + Math.floor(Math.random() * 5);
+            for (let i = 0; i < count; i++) {
+                const rx = cursor + i * 44;
+                const ry = getGroundY(rx) - 34;
+                ringsList.push({ x: rx, y: ry, collected: false });
+            }
+            cursor += count * 44 + 180;
+        } else if (segmentType < 0.56) {
+            // Робот-бадник Эггмана (Мотобаг или Базз-бомбер)
+            const isFlying = Math.random() > 0.55;
+            const gy = getGroundY(cursor);
+            enemies.push({
+                x: cursor,
+                startX: cursor,
+                y: isFlying ? gy - 95 : gy - 18,
+                range: 140 + Math.random() * 120,
+                dir: -1,
+                speed: cfg.enemySpeed * (0.85 + Math.random() * 0.4),
+                flying: isFlying,
+                alive: true
+            });
+            // Кольца сверху для прыжка
+            for (let i = -1; i <= 1; i++) {
+                ringsList.push({ x: cursor + i * 40, y: gy - 115, collected: false });
+            }
+            cursor += 340;
+        } else if (segmentType < 0.76) {
+            // Воздушная платформа с бонусными кольцами
+            const pw = 170 + Math.random() * 90;
+            const py = getGroundY(cursor) - 115;
+            platforms.push({ x: cursor, y: py, w: pw, h: 20 });
+            for (let i = 0; i < 4; i++) {
+                ringsList.push({ x: cursor + 25 + i * 38, y: py - 28, collected: false });
+            }
+            cursor += pw + 220;
+        } else if (segmentType < 0.9) {
+            // Пружина-трамплин и дуга колец в небе
+            const gy = getGroundY(cursor);
+            springs.push({ x: cursor, y: gy - 14, bounceAnim: 0 });
+            for (let i = 0; i < 6; i++) {
+                const arcX = cursor + 40 + i * 52;
+                const arcY = gy - 140 - Math.sin((i / 5) * Math.PI) * 110;
+                ringsList.push({ x: arcX, y: arcY, collected: false });
+            }
+            cursor += 420;
+        } else {
+            // Ловушка с шипами (начиная со 2 уровня)
+            const gy = getGroundY(cursor);
+            if (cfg.hasSpikes && Math.random() < cfg.spikeChance + 0.35) {
+                spikes.push({ x: cursor, y: gy - 16, w: 64 });
+                ringsList.push({ x: cursor + 32, y: gy - 95, collected: false });
+                cursor += 280;
+            } else {
+                ringsList.push({ x: cursor, y: gy - 34, collected: false });
+                cursor += 220;
+            }
+        }
+    }
+}
+
+// Сброс позиции Соника и запуск уровня
+function startGame() {
+    generateLevel();
+    sonic.x = 150;
+    sonic.y = getGroundY(150) - sonic.radius;
+    sonic.vx = 0;
+    sonic.vy = 0;
+    sonic.grounded = true;
+    sonic.rolling = false;
+    sonic.facing = 1;
+    sonic.boost = 100;
+    sonic.boosting = false;
+    sonic.invulnTimer = 0;
+
+    rings = 0;
+    cameraX = 0;
+    startTime = performance.now();
+    elapsedTime = 0;
+    gameState = 'PLAYING';
+
+    startScreen.classList.add('hidden');
+    gameOverScreen.classList.add('hidden');
+    nextLevelBtn.classList.add('hidden');
+    hud.classList.remove('hidden');
+    levelDisplay.textContent = `${currentLevel}/100 (${getLevelConfig(currentLevel).name})`;
+
+    if (window.innerWidth < 768) {
+        mobileControls.classList.remove('hidden');
+    }
+}
+
+// Создание частиц при сборе колец или уничтожении врага
+function spawnParticles(x, y, color, count = 10) {
+    for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+        const speed = 2 + Math.random() * 5;
+        particles.push({
+            x,
+            y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 1,
+            life: 1,
+            color
+        });
+    }
+}
+
+// Получение урона (потеря колец или проигрыш)
+function hurtSonic() {
+    if (sonic.invulnTimer > 0) return;
+
+    if (rings > 0) {
+        sfx.hurt();
+        const dropCount = Math.min(rings, 20);
+        for (let i = 0; i < dropCount; i++) {
+            const angle = -Math.PI * (0.15 + (0.7 * i) / dropCount);
+            const speed = 4 + Math.random() * 5;
+            scatteredRings.push({
+                x: sonic.x,
+                y: sonic.y - 10,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed - 3,
+                life: 240
+            });
+        }
+        rings = 0;
+        sonic.invulnTimer = 90;
+        sonic.vy = -7;
+        sonic.vx = -sonic.facing * 5;
+        sonic.grounded = false;
+    } else {
+        sfx.hurt();
+        endGame(false);
+    }
+}
+
+// Завершение уровня (победа или поражение)
+function endGame(isWin) {
+    gameState = isWin ? 'WIN' : 'GAMEOVER';
+    mobileControls.classList.add('hidden');
+
+    const titleEl = document.getElementById('endTitle');
+    const subEl = document.getElementById('endSubtitle');
+    const cfg = getLevelConfig(currentLevel);
+
+    if (isWin) {
+        sfx.win();
+        score += rings * 100 + currentLevel * 500;
+        if (currentLevel >= MAX_LEVELS) {
+            titleEl.textContent = 'ПОБЕДА! ВСЕ 100 УРОВНЕЙ ПРОЙДЕНЫ!';
+            titleEl.className = 'text-2xl sm:text-3xl font-black italic text-yellow-400 mb-2';
+            subEl.textContent = 'Ты полностью прошёл игру и одолел Доктора Эггмана на 100-м уровне!';
+            nextLevelBtn.classList.add('hidden');
+        } else {
+            titleEl.textContent = `УРОВЕНЬ ${currentLevel}/100 ПРОЙДЕН!`;
+            titleEl.className = 'text-2xl sm:text-4xl font-black italic text-yellow-400 mb-2';
+            subEl.textContent = `Зона «${cfg.fullName}» пройдена! Вперёд на уровень ${currentLevel + 1}!`;
+            nextLevelBtn.textContent = `▶ УРОВЕНЬ ${currentLevel + 1} / 100`;
+            nextLevelBtn.classList.remove('hidden');
+        }
+    } else {
+        titleEl.textContent = 'ИГРА ОКОНЧЕНА';
+        titleEl.className = 'text-3xl sm:text-4xl font-black italic text-red-500 mb-2';
+        subEl.textContent = `Ты остановился на уровне ${currentLevel} из 100 («${cfg.fullName}»)!`;
+        nextLevelBtn.classList.add('hidden');
+    }
+
+    document.getElementById('finalScore').textContent = score;
+    document.getElementById('finalRings').textContent = rings;
+    document.getElementById('finalDist').textContent = Math.floor(sonic.x / 10) + 'м';
+    gameOverScreen.classList.remove('hidden');
+}
+
+// Обновление физики на каждом кадре
+function update() {
+    if (gameState !== 'PLAYING') return;
+
+    elapsedTime = (performance.now() - startTime) / 1000;
+    const mins = Math.floor(elapsedTime / 60);
+    const secs = Math.floor(elapsedTime % 60).toString().padStart(2, '0');
+    timeDisplay.textContent = `${mins}:${secs}`;
+    scoreDisplay.textContent = score;
+    ringsDisplay.textContent = rings;
+
+    if (sonic.invulnTimer > 0) sonic.invulnTimer--;
+
+    // Ускорение (Boost)
+    if (keys.boost && sonic.boost > 2) {
+        if (!sonic.boosting) sfx.boost();
+        sonic.boosting = true;
+        sonic.boost = Math.max(0, sonic.boost - 0.7);
+    } else {
+        sonic.boosting = false;
+        sonic.boost = Math.min(100, sonic.boost + 0.25);
+    }
+    boostBar.style.width = `${sonic.boost}%`;
+
+    // Горизонтальное ускорение и инерция
+    const maxSpeed = sonic.boosting ? 16.5 : 10.5;
+    const accel = sonic.boosting ? 0.75 : 0.42;
+
+    if (keys.right) {
+        sonic.vx = Math.min(maxSpeed, sonic.vx + accel);
+        sonic.facing = 1;
+    } else if (keys.left) {
+        sonic.vx = Math.max(-maxSpeed, sonic.vx - accel);
+        sonic.facing = -1;
+    } else {
+        sonic.vx *= sonic.grounded ? 0.91 : 0.96;
+        if (Math.abs(sonic.vx) < 0.1) sonic.vx = 0;
+    }
+
+    // Сворачивание в клубок
+    sonic.rolling = (keys.down && Math.abs(sonic.vx) > 1.5) || !sonic.grounded;
+
+    // Прыжок
+    if (keys.up && sonic.grounded) {
+        sonic.vy = -13.2;
+        sonic.grounded = false;
+        sonic.rolling = true;
+        sfx.jump();
+    }
+
+    // Применение скорости и гравитации
+    sonic.x += sonic.vx;
+    if (sonic.x < 40) {
+        sonic.x = 40;
+        sonic.vx = 0;
+    }
+
+    const prevY = sonic.y;
+    sonic.vy += 0.62;
+    sonic.y += sonic.vy;
+    sonic.grounded = false;
+
+    // Коллизия с платформами (сверху вниз)
+    for (const p of platforms) {
+        if (
+            sonic.vy >= 0 &&
+            sonic.x + 12 > p.x &&
+            sonic.x - 12 < p.x + p.w &&
+            prevY + sonic.radius <= p.y + 8 &&
+            sonic.y + sonic.radius >= p.y
+        ) {
+            sonic.y = p.y - sonic.radius;
+            sonic.vy = 0;
+            sonic.grounded = true;
+        }
+    }
+
+    // Коллизия с поверхностью земли
+    const groundY = getGroundY(sonic.x);
+    if (sonic.y + sonic.radius >= groundY) {
+        sonic.y = groundY - sonic.radius;
+        sonic.vy = 0;
+        sonic.grounded = true;
+    }
+
+    // Анимация бега
+    sonic.animFrame += Math.abs(sonic.vx) * 0.08 + 0.1;
+
+    // След при ускорении
+    if (sonic.boosting && Math.random() < 0.6) {
+        particles.push({
+            x: sonic.x - sonic.facing * 15,
+            y: sonic.y + (Math.random() - 0.5) * 20,
+            vx: -sonic.vx * 0.3,
+            vy: (Math.random() - 0.5) * 1.5,
+            life: 0.7,
+            color: '#38bdf8'
+        });
+    }
+
+    // Сбор обычных колец
+    for (const r of ringsList) {
+        if (!r.collected) {
+            const dx = sonic.x - r.x;
+            const dy = sonic.y - r.y;
+            if (dx * dx + dy * dy < 34 * 34) {
+                r.collected = true;
+                rings++;
+                score += 10;
+                sonic.boost = Math.min(100, sonic.boost + 4);
+                sfx.ring();
+                spawnParticles(r.x, r.y, '#facc15', 6);
+            }
+        }
+    }
+
+    // Рассыпанные кольца
+    for (let i = scatteredRings.length - 1; i >= 0; i--) {
+        const sr = scatteredRings[i];
+        sr.x += sr.vx;
+        sr.vy += 0.45;
+        sr.y += sr.vy;
+        sr.life--;
+
+        const gy = getGroundY(sr.x);
+        if (sr.y + 8 >= gy) {
+            sr.y = gy - 8;
+            sr.vy = -Math.abs(sr.vy) * 0.75;
+        }
+
+        if (sr.life < 210) {
+            const dx = sonic.x - sr.x;
+            const dy = sonic.y - sr.y;
+            if (dx * dx + dy * dy < 32 * 32) {
+                rings++;
+                sfx.ring();
+                scatteredRings.splice(i, 1);
+                continue;
+            }
+        }
+        if (sr.life <= 0) scatteredRings.splice(i, 1);
+    }
+
+    // Пружины
+    for (const sp of springs) {
+        if (sp.bounceAnim > 0) sp.bounceAnim--;
+        const dx = Math.abs(sonic.x - sp.x);
+        const dy = Math.abs(sonic.y - sp.y);
+        if (dx < 28 && dy < 28) {
+            sonic.vy = -18.5;
+            sonic.grounded = false;
+            sonic.rolling = true;
+            sp.bounceAnim = 15;
+            sfx.spring();
+            spawnParticles(sp.x, sp.y, '#ef4444', 8);
+        }
+    }
+
+    // Шипы
+    for (const sk of spikes) {
+        if (
+            sonic.x + 12 > sk.x &&
+            sonic.x - 12 < sk.x + sk.w &&
+            sonic.y + sonic.radius > sk.y - 4
+        ) {
+            hurtSonic();
+        }
+    }
+
+    // Враги-бадники
+    for (const en of enemies) {
+        if (!en.alive) continue;
+        en.x += en.dir * en.speed;
+        if (Math.abs(en.x - en.startX) > en.range) {
+            en.dir *= -1;
+        }
+        if (!en.flying) {
+            en.y = getGroundY(en.x) - 18;
+        } else {
+            en.y += Math.sin(performance.now() * 0.005 + en.startX) * 0.7;
+        }
+
+        const dx = sonic.x - en.x;
+        const dy = sonic.y - en.y;
+        if (dx * dx + dy * dy < 36 * 36) {
+            if (sonic.rolling || sonic.boosting || sonic.vy > 0) {
+                en.alive = false;
+                score += 100;
+                sonic.boost = Math.min(100, sonic.boost + 15);
+                if (!sonic.grounded) sonic.vy = -10.5;
+                sfx.pop();
+                spawnParticles(en.x, en.y, '#f97316', 14);
+            } else {
+                hurtSonic();
+            }
+        }
+    }
+
+    // Обновление частиц
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.04;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    // Камера
+    const targetCamX = sonic.x - width * 0.3;
+    cameraX += (Math.max(0, targetCamX) - cameraX) * 0.14;
+
+    // Проверка финиша
+    if (sonic.x >= levelLength) {
+        endGame(true);
+    }
+}
+
+// Отрисовка мира и персонажей
+function draw() {
+    const cfg = getLevelConfig(currentLevel);
+
+    // Небо с градиентом текущей зоны
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
+    skyGrad.addColorStop(0, cfg.skyTop);
+    skyGrad.addColorStop(0.6, cfg.skyMid);
+    skyGrad.addColorStop(1, cfg.skyBot);
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, width, height);
+
+    // Дальние холмы (параллакс)
+    ctx.fillStyle = cfg.hillBack;
+    for (const h of bgHills) {
+        const hx = ((h.x - cameraX * 0.25) % (40 * 380) + (40 * 380)) % (40 * 380) - 380;
+        ctx.beginPath();
+        ctx.moveTo(hx, height);
+        ctx.quadraticCurveTo(hx + h.w / 2, height - h.h - 140, hx + h.w, height);
+        ctx.fill();
+    }
+
+    // Облака
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+    for (const c of clouds) {
+        const cx = ((c.x - cameraX * c.speed) % 12000 + 12000) % 12000 - 200;
+        ctx.beginPath();
+        ctx.arc(cx, c.y, 24 * c.scale, 0, Math.PI * 2);
+        ctx.arc(cx + 22 * c.scale, c.y - 8 * c.scale, 28 * c.scale, 0, Math.PI * 2);
+        ctx.arc(cx + 46 * c.scale, c.y, 22 * c.scale, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.save();
+    ctx.translate(-cameraX, 0);
+
+    // Земля и клетчатая текстура в стиле Green Hill
+    const startX = Math.floor(cameraX / 20) * 20 - 40;
+    const endX = cameraX + width + 60;
+
+    ctx.beginPath();
+    ctx.moveTo(startX, height);
+    for (let x = startX; x <= endX; x += 20) {
+        ctx.lineTo(x, getGroundY(x));
+    }
+    ctx.lineTo(endX, height);
+    ctx.closePath();
+    ctx.fillStyle = cfg.soilDark;
+    ctx.fill();
+
+    // Шахматные клетки на земле
+    for (let x = startX; x < endX; x += 40) {
+        const gy = getGroundY(x);
+        const colIdx = Math.floor(x / 40);
+        for (let row = 0; row < 6; row++) {
+            if ((colIdx + row) % 2 === 0) {
+                ctx.fillStyle = cfg.soilLight;
+                ctx.fillRect(x, gy + 14 + row * 36, 40, 36);
+            }
+        }
+    }
+
+    // Верхний газон / покрытие земли
+    ctx.beginPath();
+    for (let x = startX; x <= endX; x += 20) {
+        const gy = getGroundY(x);
+        if (x === startX) ctx.moveTo(x, gy);
+        else ctx.lineTo(x, gy);
+    }
+    ctx.lineWidth = 14;
+    ctx.strokeStyle = cfg.groundTop;
+    ctx.stroke();
+
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = cfg.groundDark;
+    ctx.stroke();
+
+    // Платформы
+    for (const p of platforms) {
+        if (p.x + p.w < cameraX - 50 || p.x > cameraX + width + 50) continue;
+        ctx.fillStyle = cfg.soilLight;
+        ctx.beginPath();
+        ctx.roundRect(p.x, p.y, p.w, p.h, 8);
+        ctx.fill();
+        ctx.fillStyle = cfg.groundTop;
+        ctx.beginPath();
+        ctx.roundRect(p.x, p.y, p.w, 8, [8, 8, 0, 0]);
+        ctx.fill();
+    }
+
+    // Шипы
+    for (const sk of spikes) {
+        if (sk.x + sk.w < cameraX - 50 || sk.x > cameraX + width + 50) continue;
+        const spikeCount = 4;
+        const sw = sk.w / spikeCount;
+        for (let i = 0; i < spikeCount; i++) {
+            const sx = sk.x + i * sw;
+            ctx.fillStyle = '#e2e8f0';
+            ctx.beginPath();
+            ctx.moveTo(sx, sk.y + 16);
+            ctx.lineTo(sx + sw / 2, sk.y - 10);
+            ctx.lineTo(sx + sw, sk.y + 16);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        }
+    }
+
+    // Пружины
+    for (const sp of springs) {
+        if (sp.x < cameraX - 50 || sp.x > cameraX + width + 50) continue;
+        const lift = sp.bounceAnim > 0 ? 10 : 0;
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(sp.x - 10, sp.y - lift, 20, 14 + lift);
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.roundRect(sp.x - 18, sp.y - 8 - lift, 36, 10, 4);
+        ctx.fill();
+        ctx.fillStyle = '#facc15';
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y - 3 - lift, 4, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Золотые кольца
+    const ringSpin = Math.abs(Math.cos(performance.now() * 0.006));
+    const drawRing = (rx, ry, alpha = 1) => {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = '#facc15';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.ellipse(rx, ry, Math.max(3, 11 * ringSpin), 11, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = '#fef08a';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.restore();
+    };
+
+    for (const r of ringsList) {
+        if (!r.collected && r.x > cameraX - 40 && r.x < cameraX + width + 40) {
+            drawRing(r.x, r.y);
+        }
+    }
+    for (const sr of scatteredRings) {
+        const blink = sr.life < 60 ? (Math.floor(sr.life / 4) % 2 === 0 ? 1 : 0.25) : 1;
+        drawRing(sr.x, sr.y, blink);
+    }
+
+    // Враги-бадники
+    for (const en of enemies) {
+        if (!en.alive || en.x < cameraX - 60 || en.x > cameraX + width + 60) continue;
+        ctx.save();
+        ctx.translate(en.x, en.y);
+        // Корпус
+        ctx.fillStyle = en.flying ? '#2563eb' : '#dc2626';
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        // Глаз
+        ctx.fillStyle = '#facc15';
+        ctx.beginPath();
+        ctx.arc(en.dir * 8, -3, 5, 0, Math.PI * 2);
+        ctx.fill();
+        // Крылья или колесо
+        if (en.flying) {
+            const wingY = Math.sin(performance.now() * 0.03) * 8;
+            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            ctx.beginPath();
+            ctx.ellipse(0, -18 + wingY, 16, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(0, 14, 8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    // Финишный знак (Goal Plate)
+    const finY = getGroundY(levelLength);
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillRect(levelLength - 4, finY - 110, 8, 110);
+    ctx.fillStyle = '#facc15';
+    ctx.beginPath();
+    ctx.arc(levelLength, finY - 115, 28, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.fillStyle = '#1e3a8a';
+    ctx.font = '900 11px Rubik, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('ФИНИШ', levelLength, finY - 111);
+
+    // Отрисовка Соника
+    if (sonic.invulnTimer === 0 || Math.floor(sonic.invulnTimer / 4) % 2 === 0) {
+        ctx.save();
+        ctx.translate(sonic.x, sonic.y);
+
+        // Аура ускорения
+        if (sonic.boosting) {
+            ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
+            ctx.beginPath();
+            ctx.arc(0, 0, 30, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        if (sonic.rolling) {
+            // Свернувшийся синий клубок
+            ctx.rotate(sonic.animFrame * sonic.facing);
+            ctx.fillStyle = '#2563eb';
+            ctx.beginPath();
+            ctx.arc(0, 0, sonic.radius, 0, Math.PI * 2);
+            ctx.fill();
+            // Иголки по кругу
+            ctx.fillStyle = '#1d4ed8';
+            for (let i = 0; i < 6; i++) {
+                const a = (Math.PI * 2 * i) / 6;
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(a) * 14, Math.sin(a) * 14);
+                ctx.lineTo(Math.cos(a + 0.35) * 25, Math.sin(a + 0.35) * 25);
+                ctx.lineTo(Math.cos(a + 0.65) * 14, Math.sin(a + 0.65) * 14);
+                ctx.fill();
+            }
+        } else {
+            ctx.scale(sonic.facing, 1);
+            // Иголки
+            ctx.fillStyle = '#1d4ed8';
+            for (let i = 0; i < 3; i++) {
+                ctx.beginPath();
+                ctx.moveTo(-4, -10 + i * 7);
+                ctx.lineTo(-24 + i * 2, -6 + i * 9);
+                ctx.lineTo(-4, 2 + i * 7);
+                ctx.fill();
+            }
+            // Тело и голова
+            ctx.fillStyle = '#2563eb';
+            ctx.beginPath();
+            ctx.arc(0, -3, 16, 0, Math.PI * 2);
+            ctx.fill();
+            // Мордочка
+            ctx.fillStyle = '#fed7aa';
+            ctx.beginPath();
+            ctx.ellipse(6, 1, 9, 7, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Глаз
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.ellipse(6, -6, 4.5, 6.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#16a34a';
+            ctx.beginPath();
+            ctx.arc(7.5, -6, 2.2, 0, Math.PI * 2);
+            ctx.fill();
+            // Красные кроссовки
+            const step = Math.sin(sonic.animFrame) * (Math.abs(sonic.vx) > 0.5 ? 7 : 0);
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.ellipse(-4 - step, 16, 8, 4.5, 0, 0, Math.PI * 2);
+            ctx.ellipse(6 + step, 16, 8, 4.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(-6 - step, 13, 4, 6);
+            ctx.fillRect(4 + step, 13, 4, 6);
+        }
+        ctx.restore();
+    }
+
+    // Частицы
+    for (const p of particles) {
+        ctx.globalAlpha = Math.max(0, p.life);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    ctx.restore();
+
+    // Прогресс-бар прохождения текущего уровня внизу экрана
+    if (gameState === 'PLAYING') {
+        const progress = Math.min(1, Math.max(0, sonic.x / levelLength));
+        const barW = Math.min(360, width * 0.55);
+        const barX = (width - barW) / 2;
+        const barY = 14;
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.65)';
+        ctx.beginPath();
+        ctx.roundRect(barX, barY, barW, 8, 4);
+        ctx.fill();
+        ctx.fillStyle = '#facc15';
+        ctx.beginPath();
+        ctx.roundRect(barX, barY, barW * progress, 8, 4);
+        ctx.fill();
+    }
+}
+
+// Главный игровой цикл
+function gameLoop(now) {
+    lastFrameTime = now;
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+// Обработка клавиатуры
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
+    if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') {
+        keys.up = true;
+        if (gameState === 'PLAYING') e.preventDefault();
+    }
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') keys.down = true;
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyE') keys.boost = true;
+});
+
+window.addEventListener('keyup', (e) => {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+    if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') keys.up = false;
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') keys.down = false;
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyE') keys.boost = false;
+});
+
+// Сенсорные кнопки для смартфонов
+function bindTouch(btnId, keyName) {
+    const el = document.getElementById(btnId);
+    if (!el) return;
+    const onDown = (e) => { e.preventDefault(); keys[keyName] = true; };
+    const onUp = (e) => { e.preventDefault(); keys[keyName] = false; };
+    el.addEventListener('touchstart', onDown, { passive: false });
+    el.addEventListener('touchend', onUp, { passive: false });
+    el.addEventListener('mousedown', onDown);
+    el.addEventListener('mouseup', onUp);
+    el.addEventListener('mouseleave', onUp);
+}
+bindTouch('btnLeft', 'left');
+bindTouch('btnRight', 'right');
+bindTouch('btnJump', 'up');
+bindTouch('btnBoost', 'boost');
+
+// Кнопки интерфейса
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('restartBtn').addEventListener('click', startGame);
+nextLevelBtn.addEventListener('click', () => {
+    if (currentLevel < MAX_LEVELS) {
+        selectLevel(currentLevel + 1);
+    }
+    startGame();
+});
+
+function returnToMenu() {
+    gameState = 'START';
+    hud.classList.add('hidden');
+    gameOverScreen.classList.add('hidden');
+    mobileControls.classList.add('hidden');
+    startScreen.classList.remove('hidden');
+    selectLevel(currentLevel);
+}
+
+document.getElementById('menuBtn').addEventListener('click', returnToMenu);
+document.getElementById('toMenuBtn').addEventListener('click', returnToMenu);
+
+soundToggle.addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    soundToggle.textContent = soundEnabled ? '🔊 Звук: ВКЛ' : '🔇 Звук: ВЫКЛ';
+});
+
+// Переключение любого из 100 уровней в главном меню
+function selectLevel(lvl) {
+    const validLvl = Math.max(1, Math.min(MAX_LEVELS, Number(lvl) || 1));
+    currentLevel = validLvl;
+    const cfg = getLevelConfig(validLvl);
+
+    zoneBadge.textContent = `УРОВЕНЬ ${validLvl}/100 • ${cfg.fullName}`;
+    if (levelSlider) levelSlider.value = validLvl;
+    if (levelInput) levelInput.value = validLvl;
+    if (stageCycleLabel) stageCycleLabel.textContent = `ЭТАП ${cfg.stage} / 20`;
+
+    document.querySelectorAll('.lvl-btn').forEach(btn => {
+        const bLvl = Number(btn.dataset.lvl);
+        if (bLvl === validLvl) {
+            btn.className = 'lvl-btn bg-yellow-400 text-slate-900 border-2 border-white font-black py-1.5 rounded-xl text-xs shadow-md cursor-pointer scale-105 transition';
+        } else if (bLvl === 100) {
+            btn.className = 'lvl-btn bg-red-900/80 text-red-200 border-2 border-red-500/60 font-black py-1.5 rounded-xl text-xs hover:bg-red-800 cursor-pointer transition';
+        } else {
+            btn.className = 'lvl-btn bg-blue-900/80 text-white border-2 border-blue-400/50 font-black py-1.5 rounded-xl text-xs hover:bg-blue-800 cursor-pointer transition';
+        }
+    });
+    generateLevel();
+}
+
+document.querySelectorAll('.lvl-btn').forEach(btn => {
+    btn.addEventListener('click', () => selectLevel(Number(btn.dataset.lvl)));
+});
+
+if (levelSlider) {
+    levelSlider.addEventListener('input', (e) => selectLevel(e.target.value));
+}
+if (levelInput) {
+    levelInput.addEventListener('change', (e) => selectLevel(e.target.value));
+}
+
+// Инициализация фона и запуск цикла отрисовки
+selectLevel(1);
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
